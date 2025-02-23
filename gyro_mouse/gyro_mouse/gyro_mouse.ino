@@ -142,7 +142,7 @@ float sensitivity = 0.5;
 float threshold = 8.0;
 
 float linearFunction(float x) {
-    if (x == 0) P\{return 0;}
+    if (x == 0) {return 0;}
     return 0.75*x + 0.25;
 }
 
