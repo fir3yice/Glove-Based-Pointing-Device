@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glove Input Testing</title>
+    <script>
+        let target, startTime, log = [];
+        let useSerial = false;
+        let port, reader;
+        
+        async function initSerial() {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+                reader = port.readable.getReader();
+                useSerial = true;
+                readSerial();
+            } catch (err) {
+                console.error("Serial connection failed", err);
+            }
+        }
+        
+        async function readSerial() {
+            while (useSerial) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                let data = new TextDecoder().decode(value).trim().split(',');
+                if (data.length === 3) handleGloveInput(parseFloat(data[0]), parseFloat(data[1]), parseInt(data[2]));
+            }
+        }
+        
+        function handleGloveInput(x, y, click) {
+            let pointer = document.getElementById("pointer");
+            pointer.style.left = `${x}px`;
+            pointer.style.top = `${y}px`;
+            
+            if (click) checkClick(x, y);
+        }
+        
+        function startTest(type) {
+            document.getElementById("menu").style.display = "none";
+            document.getElementById("testArea").style.display = "block";
+            placeTarget();
+        }
+        
+        function placeTarget() {
+            target = document.getElementById("target");
+            let x = Math.random() * (window.innerWidth - 50);
+            let y = Math.random() * (window.innerHeight - 50);
+            target.style.left = `${x}px`;
+            target.style.top = `${y}px`;
+            target.style.display = "block";
+            startTime = performance.now();
+        }
+        
+        function checkClick(x, y) {
+            if (!target) return;
+            let rect = target.getBoundingClientRect();
+            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                let timeTaken = performance.now() - startTime;
+                log.push(timeTaken);
+                target.style.display = "none";
+                setTimeout(placeTarget, 1000);
+            }
+        }
+        
+        function exportLog() {
+            let csvContent = "data:text/csv;charset=utf-8,Time (ms)\n" + log.join("\n");
+            let encodedUri = encodeURI(csvContent);
+            let link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "glove_test_results.csv");
+            document.body.appendChild(link);
+            link.click();
+        }
+    </script>
+    <style>
+        body { text-align: center; }
+        #pointer { position: absolute; width: 10px; height: 10px; background: red; border-radius: 50%; }
+        #target { position: absolute; width: 50px; height: 50px; background: blue; display: none; }
+        #menu { margin-top: 50px; }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h2>Select Test</h2>
+        <button onclick="startTest('click')">Clicking Test</button>
+        <button onclick="startTest('drag')">Dragging Test</button>
+        <button onclick="initSerial()">Enable Serial Input</button>
+    </div>
+    
+    <div id="testArea" style="display:none;">
+        <div id="pointer"></div>
+        <div id="target"></div>
+        <button onclick="exportLog()">Export Results</button>
+    </div>
+</body>
+</html>

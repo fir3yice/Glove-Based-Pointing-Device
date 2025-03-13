@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glove Pointer Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        .test-area {
+            width: 1000px;
+            height: 800px;
+            border: 2px solid black;
+            margin: 20px auto;
+            position: relative;
+        }
+        .target, .drop-target {
+            width: 50px;
+            height: 50px;
+            position: absolute;
+        }
+        .target {
+            background-color: red;
+        }
+        .drop-target {
+            background-color: blue;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Glove Pointer Test</h1>
+        <p>Select a test mode:</p>
+        <button onclick="startTest('click')">Click Test</button>
+        <button onclick="startTest('drag')">Drag Test</button>
+        <div class="test-area" id="testArea">
+            <div class="target" id="target"></div>
+            <div class="drop-target" id="dropTarget"></div>
+        </div>
+        <p id="result"></p>
+    </div>
+    <script>
+        let startTime, testType, dragging = false;
+        let attempts = 5, currentAttempt = 0, times = [], distances = [], errors = [];
+        let lastX = 0, lastY = 0;
+        const testArea = document.getElementById('testArea');
+        const target = document.getElementById('target');
+        const dropTarget = document.getElementById('dropTarget');
+        const result = document.getElementById('result');
+
+        function startTest(type) {
+            testType = type;
+            currentAttempt = 0;
+            times = [];
+            distances = [];
+            errors = [];
+            result.innerText = '';
+            nextAttempt();
+        }
+
+        function resetTarget(minDistance = 100) {
+            let x, y, distance;
+            do {
+                x = Math.random() * (testArea.clientWidth - 50);
+                y = Math.random() * (testArea.clientHeight - 50);
+                distance = Math.sqrt((x - lastX) ** 2 + (y - lastY) ** 2);
+            } while (distance < minDistance);
+            
+            target.style.left = `${x}px`;
+            target.style.top = `${y}px`;
+            lastX = x;
+            lastY = y;
+            distances.push(distance.toFixed(2));
+            
+            resetDropTarget(minDistance);
+        }
+
+        function resetDropTarget(minDistance = 150) {
+            let x, y, distance;
+            do {
+                x = Math.random() * (testArea.clientWidth - 50);
+                y = Math.random() * (testArea.clientHeight - 50);
+                distance = Math.sqrt((x - lastX) ** 2 + (y - lastY) ** 2);
+            } while (distance < minDistance);
+            
+            dropTarget.style.left = `${x}px`;
+            dropTarget.style.top = `${y}px`;
+        }
+
+        function nextAttempt() {
+            if (currentAttempt < attempts) {
+                resetTarget();
+                startTime = performance.now();
+                currentAttempt++;
+            } else {
+                finalizeResults();
+            }
+        }
+
+        function completeAttempt() {
+            const endTime = performance.now();
+            const timeTaken = (endTime - startTime) / 1000;
+            times.push(timeTaken.toFixed(3));
+            nextAttempt();
+        }
+
+        function finalizeResults() {
+            result.innerText = `Test complete. Times: ${times.join(', ')} seconds\nDistances: ${distances.join(', ')} px\nErrors: ${errors.join(', ')} px`;
+            logResults();
+        }
+
+        function logResults() {
+            const logData = `${new Date().toISOString()}, ${testType}, Times: ${times.join(', ')}, Distances: ${distances.join(', ')}, Errors: ${errors.join(', ')}\n`;
+            const blob = new Blob([logData], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'glove_test_log.txt';
+            a.click();
+        }
+
+        testArea.addEventListener('click', (event) => {
+            const rect = target.getBoundingClientRect();
+            const targetX = rect.left + rect.width / 2;
+            const targetY = rect.top + rect.height / 2;
+            const clickX = event.clientX;
+            const clickY = event.clientY;
+            const clickDistance = Math.sqrt((clickX - targetX) ** 2 + (clickY - targetY) ** 2);
+
+            if (testType === 'click') {
+                if (event.target === target) {
+                    completeAttempt();
+                } else {
+                    errors.push(clickDistance.toFixed(2));
+                }
+            }
+        });
+
+        target.addEventListener('mousedown', (event) => {
+            if (testType === 'drag') {
+                dragging = true;
+                event.preventDefault();
+            }
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            if (dragging) {
+                target.style.left = `${event.clientX - testArea.offsetLeft - 25}px`;
+                target.style.top = `${event.clientY - testArea.offsetTop - 25}px`;
+            }
+        });
+
+        document.addEventListener('mouseup', (event) => {
+            if (dragging) {
+                dragging = false;
+                
+                const targetRect = target.getBoundingClientRect();
+                const dropRect = dropTarget.getBoundingClientRect();
+                
+                const withinDropZone = !(targetRect.right < dropRect.left || 
+                                         targetRect.left > dropRect.right || 
+                                         targetRect.bottom < dropRect.top || 
+                                         targetRect.top > dropRect.bottom);
+                
+                if (withinDropZone) {
+                    completeAttempt();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -5,7 +5,7 @@
     #include "Wire.h"
 #endif
 #include <Mouse.h>
-#include "Adafruit_HMC5883_U.h"
+#include <Adafruit_HMC5883_U.h>
 
 MPU6050 mpu;
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
