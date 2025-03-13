@@ -33,8 +33,11 @@ volatile bool mpuInterrupt = false;
 void dmpDataReady() {
     mpuInterrupt = true;
 }
-int mouseX = 960, mouseY = 540;
-int screenWidth = 1920, screenHeight = 1080;
+// int mouseX = 960, mouseY = 540;
+// int screenWidth = 1920, screenHeight = 1080;
+
+int mouseX = 720, mouseY = 450;
+int screenWidth = 1440, screenHeight = 900;
 
 void moveMouseToOrigin() {
     // Move mouse to upper-left corner (0,0)

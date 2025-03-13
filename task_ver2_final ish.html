@@ -8,15 +8,21 @@
         body {
             font-family: Arial, sans-serif;
             text-align: center;
+            margin: 0;
+            overflow: hidden;
         }
         .container {
-            margin-top: 50px;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
         .test-area {
-            width: 1000px;
-            height: 800px;
+            width: 100vw;
+            height: 80vh;
             border: 2px solid black;
-            margin: 20px auto;
             position: relative;
         }
         .target {
@@ -31,8 +37,8 @@
             left: 50%;
             top: 50%;
             transform: translate(-50%, -50%);
-            padding: 20px 40px;
-            font-size: 24px;
+            padding: 30px 60px;
+            font-size: 28px;
             cursor: pointer;
         }
     </style>
@@ -105,7 +111,7 @@
         }
 
         function finalizeResults() {
-            result.innerText = `Test complete. Times: ${times.join(', ')} seconds\nDistances: ${distances.join(', ')} px\nErrors: ${errors.join(', ')} px\nMovements: ${movements}\nCursor Path: ${cursorPath.join(' | ')}`;
+            //result.innerText = `Test complete. Times: ${times.join(', ')} seconds\nDistances: ${distances.join(', ')} px\nErrors: ${errors.join(', ')} px\nMovements: ${movements}\nCursor Path: ${cursorPath.join(' | ')}`;
             logResults();
         }
 
