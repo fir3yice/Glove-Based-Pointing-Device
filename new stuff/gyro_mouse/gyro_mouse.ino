@@ -221,11 +221,18 @@ void snap_mouse(int id) {
     int x = screenWidth / 2, y = screenHeight / 2;  // Default to center
 
     // Base positions for IR receivers
-    switch (id) {
-        case 26: x = 0; y = screenHeight; break;  // Left Edge
-        case 33: x = screenWidth*2; y = screenHeight; break; // Right Edge
-        case 27: x = screenWidth; y = 0; break;    // Top Center
-        case 25: x = screenWidth; y = screenHeight*2; break; // Bottom Center
+    // switch (id) {
+    //     case 26: x = 0; y = screenHeight; break;  // Left Edge
+    //     case 33: x = screenWidth*2; y = screenHeight; break; // Right Edge
+    //     case 27: x = screenWidth; y = 0; break;    // Top Center
+    //     case 25: x = screenWidth; y = screenHeight*2; break; // Bottom Center
+    // }
+
+    switch(id){
+        case 26: x = 0; y = screenHeight; break;  //bottom left
+        case 33: x = 0; y = 0; break; // top left
+        case 27: x = screenWidth; y = 0; break;    // top right
+        case 25: x = screenWidth; y = screenHeight; break; // bottom right
     }
 
     // Apply magnetometer drift correction
@@ -249,11 +256,11 @@ void snap_mouse(int id) {
     signed char lastMoveX = x - (moveXtimes * 127);
     signed char lastMoveY = y - (moveYtimes * 127);
 
-    Serial.print("Moving to ");Serial.print(x);Serial.print(" ");Serial.println(y);
-    Serial.print("Move x "); Serial.print(moveXtimes); 
-    Serial.print("Move y "); Serial.println(moveYtimes); 
-    Serial.print("Move x last "); Serial.print(lastMoveX); 
-    Serial.print("Move y last "); Serial.println(lastMoveY); 
+    // Serial.print("Moving to ");Serial.print(x);Serial.print(" ");Serial.println(y);
+    // Serial.print("Move x "); Serial.print(moveXtimes); 
+    // Serial.print("Move y "); Serial.println(moveYtimes); 
+    // Serial.print("Move x last "); Serial.print(lastMoveX); 
+    // Serial.print("Move y last "); Serial.println(lastMoveY); 
 
     // Move in small steps
     for (int i = 0; i < moveXtimes; i++) {
@@ -311,85 +318,3 @@ void loop() {
 }
 
 
-
-
-
-
-//IR STUFF
-// struct IRMapping {
-//     int id;
-//     int x;
-//     int y;
-// };
-
-// // Default positions for 4 IR receivers
-// IRMapping irMappings[] = {
-//     {26, 0, screenHeight},         // Left Edge
-//     {33, screenWidth * 2, screenHeight},  // Right Edge
-//     {27, screenWidth, 0},          // Top Center
-//     {25, screenWidth, screenHeight * 2}   // Bottom Center
-// };
-// };
-// int which_IR = -1;
-// void processSerialCommand() {
-//     String command = Serial.readStringUntil('\n');  // Read serial input
-//     command.trim();  // Remove any whitespace
-
-//     if (command.startsWith("SET ")) {
-//         int irID, x, y;
-//         if (sscanf(command.c_str(), "SET %d %d %d", &irID, &x, &y) == 3) {
-//             updateIRMapping(irID, x, y);
-//             Serial.println("Updated mapping.");
-//         } else {
-//             Serial.println("Invalid format. Use: SET <ID> <X> <Y>");
-//         }
-//     }
-// }
-
-// void updateIRMapping(int irID, int x, int y) {
-//     for (int i = 0; i < sizeof(irMappings) / sizeof(irMappings[0]); i++) {
-//         if (irMappings[i].id == irID) {
-               //if (irID == 33) x *= 2;
-              //if (irID == 25) y *= 2;
-//             irMappings[i].x = x;
-//             irMappings[i].y = y;
-//             Serial.print("IR ");
-//             Serial.print(irID);
-//             Serial.print(" set to (");
-//             Serial.print(x);
-//             Serial.print(", ");
-//             Serial.println(y);
-//             return;
-//         }
-//     }
-//     Serial.println("IR ID not found.");
-// }
-// // Moves the mouse based on IR input
-// void snap_mouse(int id) {
-//     for (int i = 0; i < sizeof(irMappings) / sizeof(irMappings[0]); i++) {
-//         if (irMappings[i].id == id) {
-//             moveMouseTo(irMappings[i].x, irMappings[i].y);
-//             return;
-//         }
-//     }
-//     Serial.println("IR ID not mapped.");
-// }
-
-// // Moves the mouse using small steps
-// void moveMouseTo(int x, int y) {
-//     int moveXtimes = x / 127;
-//     int moveYtimes = y / 127;
-//     signed char lastMoveX = x - (moveXtimes * 127);
-//     signed char lastMoveY = y - (moveYtimes * 127);
-//     moveMouseToOrigin();
-
-//     // Move in steps
-//     for (int i = 0; i < moveXtimes; i++) {
-//         Mouse.move(127, 0, 0);
-//     }
-//     Mouse.move(lastMoveX, 0, 0);
-//     for (int i = 0; i < moveYtimes; i++) {
-//         Mouse.move(0, 127, 0);
-//     }
-//     Mouse.move(0, lastMoveY, 0);
-// }

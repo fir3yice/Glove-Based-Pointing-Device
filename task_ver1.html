@@ -8,15 +8,21 @@
         body {
             font-family: Arial, sans-serif;
             text-align: center;
+            margin: 0;
+            overflow: hidden;
         }
         .container {
-            margin-top: 50px;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
         .test-area {
-            width: 1000px;
-            height: 800px;
+            width: 100vw;
+            height: 80vh;
             border: 2px solid black;
-            margin: 20px auto;
             position: relative;
         }
         .target {
@@ -26,13 +32,44 @@
             background-color: red;
             pointer-events: none;
         }
+        .circle {
+            border-radius: 50%;
+        }
+        .square {
+            border-radius: 0;
+        }
+        .rectangle {
+            border-radius: 0;
+            width: 100px;
+            height: 50px;
+        }
+        .long-rectangle {
+            border-radius: 0;
+            width: 50px;
+            height: 100px;
+        }
+        .long-circle {
+            border-radius: 50%;
+            width: 100px;
+            height: 50px;
+        }
+        /*
+        .triangle {
+            width: 0;
+            height: 0;
+            border-left: 25px solid transparent;
+            border-right: 25px solid transparent;
+            border-bottom: 50px solid red;
+            background-color: transparent;
+        } */
+
         .start-button {
             position: absolute;
             left: 50%;
             top: 50%;
             transform: translate(-50%, -50%);
-            padding: 20px 40px;
-            font-size: 24px;
+            padding: 30px 60px;
+            font-size: 28px;
             cursor: pointer;
         }
     </style>
@@ -42,7 +79,7 @@
         <h1>Glove Pointer Test</h1>
         <p>Click the target as quickly as possible.</p>
         <div class="test-area" id="testArea">
-            <button class="start-button" id="startButton" onclick="startTest()">Start Test</button>
+            <button class="start-button" id="startButton" onclick="startTest(event)">Start Test</button>
             <div class="target" id="target"></div>
         </div>
         <p id="result"></p>
@@ -50,6 +87,7 @@
     <script>
         let startTime, testStartTime, currentAttempt = 0, attempts = 5;
         let times = [], distances = [], errors = [], movements = 0, cursorPath = [];
+        let hoverStartTime = 0, hoverDurations = [];
         let lastX = 0, lastY = 0;
         let testStarted = false;
         const testArea = document.getElementById('testArea');
@@ -57,20 +95,25 @@
         const startButton = document.getElementById('startButton');
         const result = document.getElementById('result');
 
-        function startTest() {
+        function startTest(event) {
+            event.stopPropagation();
+
             testStarted = true;
             testStartTime = performance.now();
             currentAttempt = 0;
             times = [];
             distances = [];
-            errors = [];
+            targetShapes = [];
+            errors = []; 
             movements = 0;
             cursorPath = [];
+            hoverDurations = [];
             result.innerText = '';
             target.style.pointerEvents = 'auto';
             startButton.style.display = 'none';
             nextAttempt();
         }
+
 
         function resetTarget(minDistance = 100) {
             let x, y, distance;
@@ -85,10 +128,19 @@
             lastX = x;
             lastY = y;
             distances.push(distance.toFixed(2));
+
+            const shapes = ['circle', 'square', 'rectangle', 'long-rectangle', 'long-circle'];
+            const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
+
+            targetShapes.push(randomShape);
+
+            target.classList.remove('circle', 'square', 'rectangle', 'long-rectangle', 'long-circle');
+            target.classList.add(randomShape);
         }
 
         function nextAttempt() {
             if (currentAttempt < attempts) {
+                errors.push([]);
                 resetTarget();
                 startTime = performance.now();
                 currentAttempt++;
@@ -105,18 +157,30 @@
         }
 
         function finalizeResults() {
-            result.innerText = `Test complete. Times: ${times.join(', ')} seconds\nDistances: ${distances.join(', ')} px\nErrors: ${errors.join(', ')} px\nMovements: ${movements}\nCursor Path: ${cursorPath.join(' | ')}`;
             logResults();
         }
 
         function logResults() {
-            const logData = `${new Date().toISOString()}, click, Times: ${times.join(', ')}, Distances: ${distances.join(', ')}, Errors: ${errors.join(', ')}, Movements: ${movements}\nCursor Path:\n${cursorPath.join('\n')}`;
-            const blob = new Blob([logData], { type: 'text/plain' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'glove_test_log.txt';
-            a.click();
-        }
+            let errorOutput = errors.map((trialErrors, index) => {
+                let trialText = trialErrors.length ? trialErrors.join(', ') : 'None';
+                return `Trial ${index + 1}: ${trialText}`;
+            }).join('\n');
+            
+                const logData = `${new Date().toISOString()}, click, 
+            Times: ${times.join(', ')}, 
+            Distances: ${distances.join(', ')}, 
+            Target Shapes: ${targetShapes.join(', ')},
+            Errors:\n${errorOutput}, 
+            Hover Durations: ${hoverDurations.join(', ')} seconds, 
+            Movements: ${movements}
+            Cursor Path:\n${cursorPath.join('\n')}`;
+                
+                const blob = new Blob([logData], { type: 'text/plain' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'glove_test_log.txt';
+                a.click();
+            }
 
         testArea.addEventListener('click', (event) => {
             if (!testStarted) return;
@@ -130,7 +194,7 @@
             if (event.target === target) {
                 completeAttempt();
             } else {
-                errors.push(clickDistance.toFixed(2));
+                errors[currentAttempt - 1].push(clickDistance.toFixed(2));
             }
         });
 
@@ -138,6 +202,18 @@
             if (!testStarted) return;
             movements++;
             cursorPath.push(`${(performance.now() - testStartTime).toFixed(1)}, ${event.clientX}, ${event.clientY}`);
+        });
+
+        target.addEventListener('mouseenter', () => {
+            hoverStartTime = performance.now();
+        });
+
+        target.addEventListener('mouseleave', () => {
+            if (hoverStartTime > 0) {
+                let hoverTime = (performance.now() - hoverStartTime) / 1000; 
+                hoverDurations.push(hoverTime.toFixed(3));
+                hoverStartTime = 0;
+            }
         });
     </script>
 </body>

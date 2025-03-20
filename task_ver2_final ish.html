@@ -134,9 +134,10 @@
             const clickDistance = Math.sqrt((clickX - targetX) ** 2 + (clickY - targetY) ** 2);
 
             if (event.target === target) {
+                //errors.push(0);
                 completeAttempt();
             } else {
-                errors.push(clickDistance.toFixed(2));
+                errors.push({ trial: currentAttempt, distance: clickDistance.toFixed(2) });
             }
         });
 
