@@ -78,11 +78,16 @@
   <script>
     let startTime, testStartTime, currentAttempt = 0, attempts = 5;
     let times = [], distances = [], errors = [], targetShapes = [];
-    let targetPositions = []; // New: store exact (x, y) positions for each target.
+    let targetPositions = []; // Stores exact (x, y) positions for each target.
     let overshoots = [];       // Array of overshoot (correction) events per trial.
     let totalHoverTimes = [];  // Total hover time per trial (in seconds).
-    let movements = 0, cursorPath = []; combinedPaths = [];
-    let hoverStartTime = 0;    // When pointer enters the target.
+    let movements = 0, cursorPath = [], combinedPaths = [];
+    // Variables for click delay:
+    let firstEntryTime = 0;    // First time the cursor enters the target in a trial.
+    let lastEntryTime = 0;     // Most recent time the cursor entered the target.
+    let firstClickDelay = [];  // Array to log delay from first entry to click.
+    let lastClickDelay = [];   // Array to log delay from last entry to click.
+    
     let overshootStartTime = 0; // When pointer leaves (start of correction period).
     let testStarted = false;
     
@@ -90,7 +95,7 @@
     const target = document.getElementById('target');
     const startButton = document.getElementById('startButton');
     const result = document.getElementById('result');
-
+    
     function startTest(event) {
       event.stopPropagation();
       testStarted = true;
@@ -106,17 +111,17 @@
       movements = 0;
       cursorPath = [];
       combinedPaths = [];
-      hoverStartTime = 0;
+      firstEntryTime = 0;
+      lastEntryTime = 0;
       overshootStartTime = 0;
       result.innerText = '';
       target.style.pointerEvents = 'auto';
       startButton.style.display = 'none';
       nextAttempt();
     }
-
+    
     function resetTarget(minDistance = 100) {
       let x, y, distance;
-      // For simplicity, using (0,0) as reference; modify if needed.
       do {
         x = Math.random() * (testArea.clientWidth - 50);
         y = Math.random() * (testArea.clientHeight - 50);
@@ -127,47 +132,34 @@
       target.style.left = `${x}px`;
       target.style.top = `${y}px`;
       distances.push(distance.toFixed(2));
-      // Log exact position.
       targetPositions.push(`(${x.toFixed(1)}, ${y.toFixed(1)})`);
-
+      
+      // Reset entry times for this trial.
+      firstEntryTime = 0;
+      lastEntryTime = 0;
+      
       const shapes = ['circle', 'square', 'rectangle', 'long-rectangle', 'long-circle'];
       const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
       targetShapes.push(randomShape);
-
+      
       target.classList.remove('circle', 'square', 'rectangle', 'long-rectangle', 'long-circle');
       target.classList.add(randomShape);
     }
-
-    // function nextAttempt() {
-    //   if (currentAttempt < attempts) {
-    //     errors.push([]);         // New error list for this trial.
-    //     overshoots.push([]);     // New overshoots list for this trial.
-    //     totalHoverTimes.push(0); // Initialize total hover time for this trial.
-    //     // Reset timers for new trial.
-    //     hoverStartTime = 0;
-    //     overshootStartTime = 0;
-    //     resetTarget();
-    //     startTime = performance.now();
-    //     currentAttempt++;
-    //   } else {
-    //     finalizeResults();
-    //   }
-    // }
+    
     function nextAttempt() {
       if (currentAttempt < attempts) {
         errors.push([]);         // New error list for this trial.
         overshoots.push([]);     // New overshoots list for this trial.
         totalHoverTimes.push(0); // Initialize total hover time for this trial.
         combinedPaths.push(...cursorPath);
-        
-        // Reset path tracking for this trial
-        testStartTime = performance.now(); // Reset timer
         cursorPath = []; // Clear previous trial's path
-
-        // Reset other trial-specific timers
-        hoverStartTime = 0;
+        
+        // Reset timers for new trial.
+        testStartTime = performance.now();
+        firstEntryTime = 0;
+        lastEntryTime = 0;
         overshootStartTime = 0;
-
+        
         resetTarget();
         startTime = performance.now();
         currentAttempt++;
@@ -176,27 +168,33 @@
         finalizeResults();
       }
     }
-
-
+    
     function completeAttempt() {
-      // If target was clicked while hovering, add that hover duration.
+      const clickTime = performance.now();
+      // Calculate click delays:
+      const fDelay = firstEntryTime > 0 ? ((clickTime - firstEntryTime) / 1000).toFixed(3) : "N/A";
+      const lDelay = lastEntryTime > 0 ? ((clickTime - lastEntryTime) / 1000).toFixed(3) : "N/A";
+      
+      firstClickDelay.push(fDelay);
+      lastClickDelay.push(lDelay);
+      
+      // If target was clicked while hovering, add remaining hover duration.
       if (hoverStartTime > 0) {
-        let duration = (performance.now() - hoverStartTime) / 1000;
+        let duration = (clickTime - hoverStartTime) / 1000;
         totalHoverTimes[currentAttempt - 1] += duration;
         hoverStartTime = 0;
       }
-      // Clear any active overshoot timing.
+      
       overshootStartTime = 0;
-      const endTime = performance.now();
-      const timeTaken = (endTime - startTime) / 1000;
+      const timeTaken = (clickTime - startTime) / 1000;
       times.push(timeTaken.toFixed(3));
       nextAttempt();
     }
-
+    
     function finalizeResults() {
       logResults();
     }
-
+    
     function logResults() {
       let errorOutput = errors.map((trialErrors, index) => {
         let trialText = trialErrors.length ? trialErrors.join(', ') : 'None';
@@ -209,13 +207,15 @@
       }).join('\n');
       
       const logData = `${new Date().toISOString()}, click, 
-Times: ${times.join(', ')}, 
+Times (Movement Time): ${times.join(', ')} seconds, 
 Distances: ${distances.join(', ')}, 
 Target Shapes: ${targetShapes.join(', ')},
 Target Positions: ${targetPositions.join(', ')},
 Errors:\n${errorOutput}, 
 Overshoots (correction times):\n${overshootOutput}, 
 Total Hover Times (per trial): ${totalHoverTimes.map(t => t.toFixed(3)).join(', ')} seconds, 
+First Entry Click Delays: ${firstClickDelay.join(', ')} seconds, 
+Most Recent Entry Click Delays: ${lastClickDelay.join(', ')} seconds, 
 Movements: ${movements}
 Cursor Path:\n${combinedPaths.join('\n')}`;
               
@@ -225,7 +225,7 @@ Cursor Path:\n${combinedPaths.join('\n')}`;
       a.download = 'glove_test_log.txt';
       a.click();
     }
-
+    
     testArea.addEventListener('click', (event) => {
       if (!testStarted) return;
       const rect = target.getBoundingClientRect();
@@ -234,10 +234,9 @@ Cursor Path:\n${combinedPaths.join('\n')}`;
       const clickX = event.clientX;
       const clickY = event.clientY;
       const clickDistance = Math.sqrt((clickX - targetX) ** 2 + (clickY - targetY) ** 2);
-
+      
       // If the target is clicked...
       if (event.target === target) {
-        // If hovering, add remaining hover duration.
         if (hoverStartTime > 0) {
           let duration = (performance.now() - hoverStartTime) / 1000;
           totalHoverTimes[currentAttempt - 1] += duration;
@@ -248,32 +247,35 @@ Cursor Path:\n${combinedPaths.join('\n')}`;
         errors[currentAttempt - 1].push(clickDistance.toFixed(2));
       }
     });
-
+    
     document.addEventListener('mousemove', (event) => {
       if (!testStarted) return;
       movements++;
       cursorPath.push(`${(performance.now() - testStartTime).toFixed(1)}, ${event.clientX}, ${event.clientY}`);
     });
-
+    
     // When pointer enters the target:
     target.addEventListener('mouseenter', () => {
+      const entryTime = performance.now();
       // If in a correction period, compute correction time.
       if (overshootStartTime > 0) {
-        let correctionTime = (performance.now() - overshootStartTime) / 1000;
+        let correctionTime = (entryTime - overshootStartTime) / 1000;
         overshoots[currentAttempt - 1].push(correctionTime.toFixed(3));
         overshootStartTime = 0;
       }
-      // Start new hover timing.
-      hoverStartTime = performance.now();
+      if (firstEntryTime === 0) {
+        firstEntryTime = entryTime; // Capture first entry time for this trial.
+      }
+      lastEntryTime = entryTime; // Always update last entry time.
+      // Start hover timing.
+      hoverStartTime = entryTime;
     });
-
+    
     // When pointer leaves the target:
     target.addEventListener('mouseleave', () => {
       if (hoverStartTime > 0) {
-        // Add the hover duration to total hover time.
         let duration = (performance.now() - hoverStartTime) / 1000;
         totalHoverTimes[currentAttempt - 1] += duration;
-        // End the current hover period.
         hoverStartTime = 0;
         // Begin correction timing.
         overshootStartTime = performance.now();

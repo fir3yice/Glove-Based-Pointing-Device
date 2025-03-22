@@ -1,0 +1,100 @@
+import os
+import pandas as pd
+import re
+
+def parse_file(filepath):
+    """Parses a single data file and returns a list of trial data rows."""
+    with open(filepath, 'r', encoding='utf-8') as file:
+        lines = file.readlines()
+    
+    session_data = {
+        'timestamp': None,
+        'event_type': None,
+        'cursor_path': []
+    }
+    trials = []
+    
+    for line in lines:
+        line = line.strip()
+        
+        if line.startswith("2025"):  # Timestamp & event type
+            parts = line.split(", ")
+            session_data['timestamp'] = parts[0]
+            session_data['event_type'] = parts[1]
+        
+        elif line.startswith("Times:"):
+            times = list(map(float, re.findall(r"\d+\.\d+", line)))
+        
+        elif line.startswith("Distances:"):
+            distances = list(map(float, re.findall(r"\d+\.\d+", line)))
+        
+        elif line.startswith("Target Shapes:"):
+            shapes = line.split(": ")[1].split(", ")
+        
+        elif line.startswith("Target Positions:"):
+            positions = re.findall(r"\(([^)]+)\)", line)
+            positions = [tuple(map(float, p.split(", "))) for p in positions]
+        
+        elif line.startswith("Errors:"):
+            errors = {}
+        elif line.startswith("Trial"):
+            trial_num = int(re.search(r"Trial (\d+)", line).group(1))
+            error_list = re.findall(r"[A-Za-z]+", line.split(": ")[1])
+            errors[trial_num] = error_list if error_list else None
+        
+        elif line.startswith("Overshoots (correction times):"):
+            overshoots = {}
+        elif line.startswith("Trial"):
+            trial_num = int(re.search(r"Trial (\d+)", line).group(1))
+            overshoot_times = list(map(float, re.findall(r"\d+\.\d+", line)))
+            overshoots[trial_num] = overshoot_times if overshoot_times else None
+        
+        elif line.startswith("Total Hover Times"):
+            hover_times = list(map(float, re.findall(r"\d+\.\d+", line)))
+        
+        elif line.startswith("Movements:"):
+            movement_count = int(line.split(": ")[1])
+        
+        elif line.startswith("Cursor Path:"):
+            session_data['cursor_path'] = []
+        elif line and line[0].isdigit():
+            session_data['cursor_path'].append(tuple(map(float, line.split(", "))))
+    
+    # Convert session cursor path to a list of tuples
+    session_data['cursor_path'] = session_data['cursor_path'] if session_data['cursor_path'] else None
+    
+    # Create trial data rows
+    for i in range(len(times)):
+        trial_data = {
+            'timestamp': session_data['timestamp'],
+            'event_type': session_data['event_type'],
+            'trial': i + 1,
+            'click_time': times[i],
+            'distance': distances[i],
+            'target_shape': shapes[i],
+            'target_position': positions[i],
+            'errors': errors.get(i + 1, None),
+            'overshoot_times': overshoots.get(i + 1, None),
+            'hover_time': hover_times[i],
+            'movement_count': movement_count,
+            'cursor_path': session_data['cursor_path'],  # Stored at session level
+        }
+        trials.append(trial_data)
+    
+    return trials
+
+def read_all_files(folder_path):
+    """Reads all files in a folder and compiles them into a DataFrame."""
+    all_trials = []
+    
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".txt"):  # Adjust based on file type
+            file_path = os.path.join(folder_path, filename)
+            all_trials.extend(parse_file(file_path))
+    
+    return pd.DataFrame(all_trials)
+
+# Load all data files in the folder
+folder_path = "data"
+data = read_all_files(folder_path)
+print(data.head())
