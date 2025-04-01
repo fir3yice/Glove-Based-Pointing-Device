@@ -14,7 +14,7 @@ Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
 #define TOUCH_LEFT 7   // TTP223B for Left Click
 #define TOUCH_RIGHT 8  // TTP223B for Right Click
 #define TOUCH_MIDDLE 9 // TTP223B for Middle Click
-#define LED_PIN 13     // On-board LED (optional)
+#define LED_PIN 13    
 #define IR_EMITTER_PIN 10
 
 bool dmpReady = false;
@@ -33,8 +33,6 @@ volatile bool mpuInterrupt = false;
 void dmpDataReady() {
     mpuInterrupt = true;
 }
-// int mouseX = 960, mouseY = 540;
-// int screenWidth = 1920, screenHeight = 1080;
 
 int mouseX = 720, mouseY = 450;
 int screenWidth = 1440, screenHeight = 900;
@@ -139,9 +137,6 @@ float threshold = 8.0;
 // }
 
 
-
-
-
 int clickDelay = 200;  // Adjustable delay for debouncing clicks
 
 void checkMouseClicks() {
@@ -171,10 +166,6 @@ float heading = 0;
 float mag_xyz[3] = {0, 0, 0};
 void get_mag(){
     mag.getEvent(&event);
-    // Serial.print("Magnetometer Data: ");
-    // Serial.print("X: "); Serial.print(event.magnetic.x); Serial.print(" ");
-    // Serial.print("Y: "); Serial.print(event.magnetic.y); Serial.print(" ");
-    // Serial.print("Z: "); Serial.print(event.magnetic.z); Serial.print(" ");
     mag_xyz[0] = event.magnetic.x;
     mag_xyz[1] = event.magnetic.y;
     mag_xyz[2] = event.magnetic.z;
@@ -183,17 +174,11 @@ void get_mag(){
     if (heading < 0) heading += 2 * PI;
     if (heading > 2 * PI) heading -= 2 * PI;
     heading = heading * 180 / M_PI; // degrees
-    //Serial.print("Heading: "); Serial.print(heading);
 
     float x_drift = event.magnetic.x - initial_values[3];
     float y_drift = event.magnetic.y - initial_values[4];
     float z_drift = event.magnetic.z - initial_values[5];
-    // Serial.print("X Drift: "); Serial.print(x_drift); Serial.print(" ");
-    // Serial.print("Y Drift: "); Serial.print(y_drift); Serial.print(" ");
-    // Serial.print("Z Drift: "); Serial.print(z_drift); Serial.print(" ");
     float heading_drift = heading - initial_values[6];
-    //Serial.print("Heading Drift: "); Serial.println(heading_drift);
-
 }
 
 void moveMouse(float x, float y) {
@@ -262,7 +247,6 @@ void snap_mouse(int id) {
     // Serial.print("Move x last "); Serial.print(lastMoveX); 
     // Serial.print("Move y last "); Serial.println(lastMoveY); 
 
-    // Move in small steps
     for (int i = 0; i < moveXtimes; i++) {
         Mouse.move(127, 0, 0);
         delay(3);
