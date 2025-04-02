@@ -23,7 +23,6 @@ uint16_t packetSize;
 uint16_t fifoCount;
 uint8_t fifoBuffer[64];
 
-
 Quaternion q;
 VectorFloat gravity;
 float ypr[3] = {0, 0, 0};
@@ -36,10 +35,6 @@ void dmpDataReady() {
 
 int mouseX = 720, mouseY = 450;
 int screenWidth = 1440, screenHeight = 900;
-
-unsigned long myTime;
-bool isMouseMoving = false;
-bool isMouseMovingPrev = false;
 
 void moveMouseToOrigin() {
     // Move mouse to upper-left corner (0,0)
@@ -62,7 +57,6 @@ void setup() {
     //mouseX = 960;
     //mouseY = 540;
     moveMouseToOrigin();
-    myTime=millis();
 
     pinMode(TOUCH_LEFT, INPUT);
     pinMode(TOUCH_RIGHT, INPUT);
@@ -169,8 +163,6 @@ void get_mag(){
 
 void moveMouse(float x, float y) {
     // Get magnetometer drift values
-    
-    
     float drift_x = mag_xyz[0] - initial_values[3];
     float drift_y = mag_xyz[1] - initial_values[4];
 
@@ -183,14 +175,6 @@ void moveMouse(float x, float y) {
     
     if (abs(y) < threshold / 2) y = 0;
     else y -= (y > 0) ? threshold / 2 : -threshold / 2;
-
-    if(x > 0 || y > 0){
-      isMouseMoving = true;
-      isMouseMovingPrev = true;
-    }
-    else{
-      isMouseMoving = false;
-    }
     
     float converted = 0.75 * sensitivity + 0.25;
     Mouse.move(x * converted, y * converted);
@@ -261,7 +245,6 @@ int which_IR = -1;
 unsigned long lastIRTime = 0;
 bool IRActive = false;
 
-unsigned long currTime;
 void loop() {
     if (!dmpReady) return;
     get_mag();
@@ -286,64 +269,16 @@ void loop() {
 
     // Normal MPU-based movement
     get_mag();
-    if(mpu.dmpGetCurrentFIFOPacket(fifoBuffer)){
+    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
         mpu.dmpGetQuaternion(&q, fifoBuffer);
         mpu.dmpGetGravity(&gravity, &q);
         mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
         
-        // Apply drift correction
-        // ypr[0] -= (mag_xyz[0] - initial_values[3]) * 0.1; // Adjust scaling factor as needed
-        // ypr[1] -= (mag_xyz[1] - initial_values[4]) * 0.1;
-        // ypr[2] -= (mag_xyz[2] - initial_values[5]) * 0.1;
-
         if (abs(ypr[1] * 180 / M_PI) < 3 * threshold) {
-            //set isMouseMoving to true in the function...
-            for (int i=0; i<3; i++){
-              Serial.print(ypr[i]* 180 / M_PI);
-              Serial.print(" ");
-            }
-            Serial.println(" ");
-            
             moveMouse(ypr[0] * 180 / M_PI, ypr[2] * 180 / M_PI);
-        }
-        else{
-          if(isMouseMoving == true){
-            isMouseMoving = false;
-          }
-          else
-            isMouseMovingPrev = false;
         }
         checkMouseClicks();
     }
-
-    if(isMouseMoving == true){
-      isMouseMoving = false;
-    }
-    else{
-      isMouseMovingPrev = false;
-    }
-    
-    Serial.print(currTime);
-    Serial.print(" "); Serial.print(myTime); Serial.print(" "); Serial.println(isMouseMovingPrev);
-    
-    currTime = millis();
-    if ((currTime - myTime) > 30000 && (!isMouseMovingPrev)) {
-      Serial.println("30 seconds");
-        if (abs(mag_xyz[0] - initial_values[3]) > 2 || abs(mag_xyz[1] - initial_values[4]) > 2) {
-            myTime = currTime;
-            
-            // **Reset MPU reference angles using magnetometer**
-            initial_values[0] = ypr[0] - (mag_xyz[0] - initial_values[3]);
-            initial_values[1] = ypr[1];  // Pitch might not need correction
-            initial_values[2] = ypr[2] - (mag_xyz[1] - initial_values[4]);
-
-            // Update yaw reference
-            initial_values[3] = mag_xyz[0];
-            initial_values[4] = mag_xyz[1];
-
-            Serial.println("MPU Reset: Correcting drift using magnetometer");
-        }
-  }
 }
 
 

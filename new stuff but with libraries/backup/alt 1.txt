@@ -170,7 +170,7 @@ void get_mag(){
 void moveMouse(float x, float y) {
     // Get magnetometer drift values
     
-    
+    isMouseMoving = true;
     float drift_x = mag_xyz[0] - initial_values[3];
     float drift_y = mag_xyz[1] - initial_values[4];
 
@@ -183,17 +183,10 @@ void moveMouse(float x, float y) {
     
     if (abs(y) < threshold / 2) y = 0;
     else y -= (y > 0) ? threshold / 2 : -threshold / 2;
-
-    if(x > 0 || y > 0){
-      isMouseMoving = true;
-      isMouseMovingPrev = true;
-    }
-    else{
-      isMouseMoving = false;
-    }
     
     float converted = 0.75 * sensitivity + 0.25;
     Mouse.move(x * converted, y * converted);
+    isMouseMovingPrev = true;
 }
 
 //WORKS
@@ -302,8 +295,6 @@ void loop() {
               Serial.print(ypr[i]* 180 / M_PI);
               Serial.print(" ");
             }
-            Serial.println(" ");
-            
             moveMouse(ypr[0] * 180 / M_PI, ypr[2] * 180 / M_PI);
         }
         else{
@@ -313,22 +304,11 @@ void loop() {
           else
             isMouseMovingPrev = false;
         }
-        checkMouseClicks();
     }
-
-    if(isMouseMoving == true){
-      isMouseMoving = false;
-    }
-    else{
-      isMouseMovingPrev = false;
-    }
-    
-    Serial.print(currTime);
-    Serial.print(" "); Serial.print(myTime); Serial.print(" "); Serial.println(isMouseMovingPrev);
+    checkMouseClicks();
     
     currTime = millis();
-    if ((currTime - myTime) > 30000 && (!isMouseMovingPrev)) {
-      Serial.println("30 seconds");
+    if ((currTime - myTime) > 30000 && !isMouseMovingPrev) {
         if (abs(mag_xyz[0] - initial_values[3]) > 2 || abs(mag_xyz[1] - initial_values[4]) > 2) {
             myTime = currTime;
             

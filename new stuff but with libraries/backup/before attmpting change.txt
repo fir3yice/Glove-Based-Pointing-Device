@@ -1,5 +1,6 @@
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps612.h"
+#include <MadgwickAHRS.h>
 
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
     #include "Wire.h"
@@ -13,6 +14,7 @@ Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
 #define INTERRUPT_PIN 2
 #define TOUCH_LEFT 7   // TTP223B for Left Click
 #define TOUCH_RIGHT 8  // TTP223B for Right Click
+// #define TOUCH_MIDDLE 9 // TTP223B for Middle Click
 #define LED_PIN 13    
 #define IR_EMITTER_PIN 10
 
@@ -23,11 +25,13 @@ uint16_t packetSize;
 uint16_t fifoCount;
 uint8_t fifoBuffer[64];
 
-
 Quaternion q;
 VectorFloat gravity;
 float ypr[3] = {0, 0, 0};
-float initial_values[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+float initial_values[7] = {0, 0, 0, 0, 0, 0, 0};
+bool isMouseMovingPrev = false;
+bool isMouseMoving = false;
+unsigned long myTime;
 
 volatile bool mpuInterrupt = false;
 void dmpDataReady() {
@@ -36,10 +40,6 @@ void dmpDataReady() {
 
 int mouseX = 720, mouseY = 450;
 int screenWidth = 1440, screenHeight = 900;
-
-unsigned long myTime;
-bool isMouseMoving = false;
-bool isMouseMovingPrev = false;
 
 void moveMouseToOrigin() {
     // Move mouse to upper-left corner (0,0)
@@ -51,6 +51,9 @@ void moveMouseToOrigin() {
     }
 }
 
+Madgwick filter;
+const float sampleRate = 100.0; // 100 Hz
+
 void setup() {
     Wire.begin();
     Wire.setClock(400000);
@@ -61,15 +64,15 @@ void setup() {
     //Mouse.move(960 - mouseX, 540 - mouseY);
     //mouseX = 960;
     //mouseY = 540;
+    filter.begin(sampleRate);
     moveMouseToOrigin();
-    myTime=millis();
 
     pinMode(TOUCH_LEFT, INPUT);
     pinMode(TOUCH_RIGHT, INPUT);
     pinMode(LED_PIN, OUTPUT);
 
     mpu.initialize();
-    Serial.println(mpu.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+    //Serial.println(mpu.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
     devStatus = mpu.dmpInitialize();
     mpu.setXGyroOffset(220);
@@ -85,16 +88,16 @@ void setup() {
         dmpReady = true;
         packetSize = mpu.dmpGetFIFOPacketSize();
     } else {
-        Serial.print("DMP Initialization failed (code ");
-        Serial.print(devStatus);
-        Serial.println(")");
+        //Serial.print("DMP Initialization failed (code ");
+        //Serial.print(devStatus);
+        //Serial.println(")");
     }
 
-    if (!mag.begin()) {
-        Serial.println("HMC5883L not detected!");
-    } else {
-        Serial.println("HMC5883L detected!");
-    }
+    // if (!mag.begin()) {
+    //     //Serial.println("HMC5883L not detected!");
+    // } else {
+    //     //Serial.println("HMC5883L detected!");
+    // }
 
     //do calibrations
     mpu.dmpGetQuaternion(&q, fifoBuffer);
@@ -113,22 +116,18 @@ void setup() {
     heading += declinationAngle;
     if (heading < 0) heading += 2 * PI;
     if (heading > 2 * PI) heading -= 2 * PI;
-    float heading_deg = heading * 180 / M_PI;
-    initial_values[6] = heading_deg;
-    Serial.print("Initial values: ");
-    for (int i = 0; i < 6; i++) {
-        Serial.print(initial_values[i]);
-        Serial.print(" ");
-    }
+    initial_values[6] = heading;
 
     pinMode(IR_EMITTER_PIN, OUTPUT);
     digitalWrite(IR_EMITTER_PIN, HIGH);  // Always ON (emitting) (might change to make it dependent on the gyroscope angle or something?)
-    Serial.print("Emitter on");
+    Serial.println("Emitter on");
+    myTime = millis();
 }
 
 float sensitivity = 0.5;
 float threshold = 8.0;
-int clickDelay = 200;  
+
+int clickDelay = 200;  // Adjustable delay for debouncing clicks
 
 void checkMouseClicks() {
     if (digitalRead(TOUCH_LEFT) == HIGH) {
@@ -141,7 +140,7 @@ void checkMouseClicks() {
         Mouse.click(MOUSE_RIGHT);
         delay(clickDelay);
     }
-    if (digitalRead(TOUCH_LEFT) == LOW && digitalRead(TOUCH_RIGHT) == LOW) {
+    if (digitalRead(TOUCH_LEFT) == LOW && digitalRead(TOUCH_RIGHT) == LOW){
         digitalWrite(LED_PIN, LOW);
     }
 }
@@ -159,7 +158,7 @@ void get_mag(){
     heading += declinationAngle;
     if (heading < 0) heading += 2 * PI;
     if (heading > 2 * PI) heading -= 2 * PI;
-    heading = heading * 180 / M_PI; // degrees
+    //heading = heading * 180 / M_PI; // degrees
 
     float x_drift = event.magnetic.x - initial_values[3];
     float y_drift = event.magnetic.y - initial_values[4];
@@ -169,7 +168,6 @@ void get_mag(){
 
 void moveMouse(float x, float y) {
     // Get magnetometer drift values
-    
     
     float drift_x = mag_xyz[0] - initial_values[3];
     float drift_y = mag_xyz[1] - initial_values[4];
@@ -183,17 +181,10 @@ void moveMouse(float x, float y) {
     
     if (abs(y) < threshold / 2) y = 0;
     else y -= (y > 0) ? threshold / 2 : -threshold / 2;
-
-    if(x > 0 || y > 0){
-      isMouseMoving = true;
-      isMouseMovingPrev = true;
-    }
-    else{
-      isMouseMoving = false;
-    }
     
     float converted = 0.75 * sensitivity + 0.25;
     Mouse.move(x * converted, y * converted);
+    isMouseMovingPrev = true;
 }
 
 //WORKS
@@ -208,7 +199,6 @@ void snap_mouse(int id) {
     //     case 27: x = screenWidth; y = 0; break;    // Top Center
     //     case 25: x = screenWidth; y = screenHeight*2; break; // Bottom Center
     // }
-
     switch(id){
         case 26: x = 0; y = screenHeight; break;  //bottom left
         case 33: x = 0; y = 0; break; // top left
@@ -254,96 +244,89 @@ void snap_mouse(int id) {
         delay(3);
     }
     Mouse.move(0, lastMoveY, 0);
+    isMouseMovingPrev = true;
 }
 
 
 int which_IR = -1;
 unsigned long lastIRTime = 0;
 bool IRActive = false;
-
 unsigned long currTime;
+
+int16_t accelX, accelY, accelZ;
+int16_t gyroX, gyroY, gyroZ;
 void loop() {
     if (!dmpReady) return;
     get_mag();
-    // Check for IR receiver activation
+    mpu.getAcceleration(&accelX, &accelY, &accelZ);
+    mpu.getRotation(&gyroX, &gyroY, &gyroZ);
+
+    // Convert gyro to rad/s and accel to g (assuming 2g range, 250 deg/s)
+    float gx = gyroX * DEG_TO_RAD / 131.0; // 131 LSB/°/s for 250 dps
+    float gy = gyroY * DEG_TO_RAD / 131.0;
+    float gz = gyroZ * DEG_TO_RAD / 131.0;
+
+    float ax = accelX / 16384.0; // 16384 LSB/g for 2g
+    float ay = accelY / 16384.0;
+    float az = accelZ / 16384.0;
+
+    // Feed data to Madgwick filter
+    filter.update(gx, gy, gz, ax, ay, az, mag_xyz[0], mag_xyz[1], mag_xyz[2]);
+
+    // Get filtered angles
+    float roll = filter.getRoll();
+    float pitch = filter.getPitch();
+    float yaw = filter.getYaw();
+
+    Serial.print("Roll: "); Serial.print(roll);
+    Serial.print(" | Pitch: "); Serial.print(pitch);
+    Serial.print(" | Yaw: "); Serial.println(yaw);
+
+
+
     if (Serial1.available()) {
         String input = Serial1.readStringUntil('\n');
         which_IR = input.toInt();
         
         if (which_IR >= 0) {
+            isMouseMoving = true;
             snap_mouse(which_IR);
             IRActive = true;
             lastIRTime = millis();
         }
     }
 
-    // Block MPU movement if IR was triggered recently
     if (IRActive && millis() - lastIRTime < 1000) {
-        return;  // Skip MPU-based movement
+        return; 
     } else {
-        IRActive = false;  // Resume normal movement after 1 sec
+        IRActive = false;  
     }
 
     // Normal MPU-based movement
-    get_mag();
-    if(mpu.dmpGetCurrentFIFOPacket(fifoBuffer)){
-        mpu.dmpGetQuaternion(&q, fifoBuffer);
-        mpu.dmpGetGravity(&gravity, &q);
-        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+    
+    // if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+    //     mpu.dmpGetQuaternion(&q, fifoBuffer);
+    //     mpu.dmpGetGravity(&gravity, &q);
+    //     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
         
-        // Apply drift correction
-        // ypr[0] -= (mag_xyz[0] - initial_values[3]) * 0.1; // Adjust scaling factor as needed
-        // ypr[1] -= (mag_xyz[1] - initial_values[4]) * 0.1;
-        // ypr[2] -= (mag_xyz[2] - initial_values[5]) * 0.1;
-
-        if (abs(ypr[1] * 180 / M_PI) < 3 * threshold) {
-            //set isMouseMoving to true in the function...
-            for (int i=0; i<3; i++){
-              Serial.print(ypr[i]* 180 / M_PI);
-              Serial.print(" ");
-            }
-            Serial.println(" ");
-            
-            moveMouse(ypr[0] * 180 / M_PI, ypr[2] * 180 / M_PI);
-        }
-        else{
-          if(isMouseMoving == true){
-            isMouseMoving = false;
-          }
-          else
-            isMouseMovingPrev = false;
-        }
-        checkMouseClicks();
-    }
-
-    if(isMouseMoving == true){
-      isMouseMoving = false;
-    }
-    else{
-      isMouseMovingPrev = false;
-    }
-    
-    Serial.print(currTime);
-    Serial.print(" "); Serial.print(myTime); Serial.print(" "); Serial.println(isMouseMovingPrev);
-    
-    currTime = millis();
-    if ((currTime - myTime) > 30000 && (!isMouseMovingPrev)) {
-      Serial.println("30 seconds");
-        if (abs(mag_xyz[0] - initial_values[3]) > 2 || abs(mag_xyz[1] - initial_values[4]) > 2) {
-            myTime = currTime;
-            
-            // **Reset MPU reference angles using magnetometer**
-            initial_values[0] = ypr[0] - (mag_xyz[0] - initial_values[3]);
-            initial_values[1] = ypr[1];  // Pitch might not need correction
-            initial_values[2] = ypr[2] - (mag_xyz[1] - initial_values[4]);
-
-            // Update yaw reference
-            initial_values[3] = mag_xyz[0];
-            initial_values[4] = mag_xyz[1];
-
-            Serial.println("MPU Reset: Correcting drift using magnetometer");
-        }
-  }
+    //     if (abs(ypr[1] * 180 / M_PI) < 3 * threshold) {
+    //         isMouseMoving = true;
+    //         moveMouse(ypr[0] * 180 / M_PI, ypr[2] * 180 / M_PI);
+    //     }
+    //     else{
+    //       if(isMouseMoving == true){
+    //         isMouseMoving = false;
+    //       }
+    //       else
+    //         isMouseMovingPrev = false;
+    //     }
+    //     checkMouseClicks();
+    // }
+    // currTime = millis();
+    // if( ((currTime-myTime) > 30000) && !isMouseMovingPrev && ( (abs(mag_xyz[0]-initial_values[3]) > 10) || (abs(mag_xyz[1]-initial_values[4]) > 7.5) )){
+    //   myTime =  currTime;
+    //   //recalibrate?
+    // }
 }
 
 
