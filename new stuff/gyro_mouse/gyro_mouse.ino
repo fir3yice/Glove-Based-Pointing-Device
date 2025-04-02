@@ -35,7 +35,7 @@ void dmpDataReady() {
 }
 
 int mouseX = 720, mouseY = 450;
-int screenWidth = 1440, screenHeight = 900;
+int screenWidth = 1200, screenHeight = 750;
 
 unsigned long myTime;
 bool isMouseMoving = false;
@@ -61,7 +61,7 @@ void setup() {
     //Mouse.move(960 - mouseX, 540 - mouseY);
     //mouseX = 960;
     //mouseY = 540;
-    moveMouseToOrigin();
+    //moveMouseToOrigin();
     myTime=millis();
 
     pinMode(TOUCH_LEFT, INPUT);
@@ -211,8 +211,8 @@ void snap_mouse(int id) {
 
     switch(id){
         case 26: x = 0; y = screenHeight; break;  //bottom left
-        case 33: x = 0; y = 0; break; // top left
-        case 27: x = screenWidth; y = 0; break;    // top right
+        case 33: x = 0; y = 200; break; // top left
+        case 27: x = screenWidth; y = 200; break;    // top right
         case 25: x = screenWidth; y = screenHeight; break; // bottom right
     }
 
@@ -298,11 +298,11 @@ void loop() {
 
         if (abs(ypr[1] * 180 / M_PI) < 3 * threshold) {
             //set isMouseMoving to true in the function...
-            for (int i=0; i<3; i++){
-              Serial.print(ypr[i]* 180 / M_PI);
-              Serial.print(" ");
-            }
-            Serial.println(" ");
+            // for (int i=0; i<3; i++){
+            //   Serial.print(ypr[i]* 180 / M_PI);
+            //   Serial.print(" ");
+            // }
+            // Serial.println(" ");
             
             moveMouse(ypr[0] * 180 / M_PI, ypr[2] * 180 / M_PI);
         }
@@ -323,12 +323,11 @@ void loop() {
       isMouseMovingPrev = false;
     }
     
-    Serial.print(currTime);
-    Serial.print(" "); Serial.print(myTime); Serial.print(" "); Serial.println(isMouseMovingPrev);
+    // Serial.print(currTime);
+    // Serial.print(" "); Serial.print(myTime); Serial.print(" "); Serial.println(isMouseMovingPrev);
     
     currTime = millis();
     if ((currTime - myTime) > 30000 && (!isMouseMovingPrev)) {
-      Serial.println("30 seconds");
         if (abs(mag_xyz[0] - initial_values[3]) > 2 || abs(mag_xyz[1] - initial_values[4]) > 2) {
             myTime = currTime;
             
