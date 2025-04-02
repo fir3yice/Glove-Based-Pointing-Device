@@ -5,7 +5,7 @@
     #include "Wire.h"
 #endif
 #include <Mouse.h>
-#include <Adafruit_HMC5883_U.h>
+#include "Adafruit_HMC5883_U.h"
 
 MPU6050 mpu;
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
@@ -13,8 +13,7 @@ Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
 #define INTERRUPT_PIN 2
 #define TOUCH_LEFT 7   // TTP223B for Left Click
 #define TOUCH_RIGHT 8  // TTP223B for Right Click
-#define TOUCH_MIDDLE 9 // TTP223B for Middle Click
-#define LED_PIN 13     // On-board LED (optional)
+#define LED_PIN 13    
 #define IR_EMITTER_PIN 10
 
 bool dmpReady = false;
@@ -23,6 +22,7 @@ uint8_t devStatus;
 uint16_t packetSize;
 uint16_t fifoCount;
 uint8_t fifoBuffer[64];
+
 
 Quaternion q;
 VectorFloat gravity;
@@ -33,8 +33,13 @@ volatile bool mpuInterrupt = false;
 void dmpDataReady() {
     mpuInterrupt = true;
 }
-int mouseX = 960, mouseY = 540;
-int screenWidth = 1920, screenHeight = 1080;
+
+int mouseX = 720, mouseY = 450;
+int screenWidth = 1200, screenHeight = 750;
+
+unsigned long myTime;
+bool isMouseMoving = false;
+bool isMouseMovingPrev = false;
 
 void moveMouseToOrigin() {
     // Move mouse to upper-left corner (0,0)
@@ -56,11 +61,11 @@ void setup() {
     //Mouse.move(960 - mouseX, 540 - mouseY);
     //mouseX = 960;
     //mouseY = 540;
-    moveMouseToOrigin();
+    //moveMouseToOrigin();
+    myTime=millis();
 
     pinMode(TOUCH_LEFT, INPUT);
     pinMode(TOUCH_RIGHT, INPUT);
-    pinMode(TOUCH_MIDDLE, INPUT);
     pinMode(LED_PIN, OUTPUT);
 
     mpu.initialize();
@@ -123,23 +128,7 @@ void setup() {
 
 float sensitivity = 0.5;
 float threshold = 8.0;
-
-// void moveMouse(float x, float y) {
-//     if (abs(x) < threshold) x = 0;
-//     else x -= (x > 0) ? threshold : -threshold;
-    
-//     if (abs(y) < threshold / 2) y = 0;
-//     else y -= (y > 0) ? threshold / 2 : -threshold / 2;
-    
-//     float converted = 0.75 * sensitivity + 0.25;
-//     Mouse.move(x * converted, y * converted);
-// }
-
-
-
-
-
-int clickDelay = 200;  // Adjustable delay for debouncing clicks
+int clickDelay = 200;  
 
 void checkMouseClicks() {
     if (digitalRead(TOUCH_LEFT) == HIGH) {
@@ -152,12 +141,7 @@ void checkMouseClicks() {
         Mouse.click(MOUSE_RIGHT);
         delay(clickDelay);
     }
-    if (digitalRead(TOUCH_MIDDLE) == HIGH) {
-        digitalWrite(LED_PIN, HIGH);
-        Mouse.click(MOUSE_MIDDLE);
-        delay(clickDelay);
-    }
-    if (digitalRead(TOUCH_LEFT) == LOW && digitalRead(TOUCH_RIGHT) == LOW && digitalRead(TOUCH_MIDDLE) == LOW) {
+    if (digitalRead(TOUCH_LEFT) == LOW && digitalRead(TOUCH_RIGHT) == LOW) {
         digitalWrite(LED_PIN, LOW);
     }
 }
@@ -168,10 +152,6 @@ float heading = 0;
 float mag_xyz[3] = {0, 0, 0};
 void get_mag(){
     mag.getEvent(&event);
-    // Serial.print("Magnetometer Data: ");
-    // Serial.print("X: "); Serial.print(event.magnetic.x); Serial.print(" ");
-    // Serial.print("Y: "); Serial.print(event.magnetic.y); Serial.print(" ");
-    // Serial.print("Z: "); Serial.print(event.magnetic.z); Serial.print(" ");
     mag_xyz[0] = event.magnetic.x;
     mag_xyz[1] = event.magnetic.y;
     mag_xyz[2] = event.magnetic.z;
@@ -180,21 +160,17 @@ void get_mag(){
     if (heading < 0) heading += 2 * PI;
     if (heading > 2 * PI) heading -= 2 * PI;
     heading = heading * 180 / M_PI; // degrees
-    //Serial.print("Heading: "); Serial.print(heading);
 
     float x_drift = event.magnetic.x - initial_values[3];
     float y_drift = event.magnetic.y - initial_values[4];
     float z_drift = event.magnetic.z - initial_values[5];
-    // Serial.print("X Drift: "); Serial.print(x_drift); Serial.print(" ");
-    // Serial.print("Y Drift: "); Serial.print(y_drift); Serial.print(" ");
-    // Serial.print("Z Drift: "); Serial.print(z_drift); Serial.print(" ");
     float heading_drift = heading - initial_values[6];
-    //Serial.print("Heading Drift: "); Serial.println(heading_drift);
-
 }
 
 void moveMouse(float x, float y) {
     // Get magnetometer drift values
+    
+    
     float drift_x = mag_xyz[0] - initial_values[3];
     float drift_y = mag_xyz[1] - initial_values[4];
 
@@ -207,6 +183,14 @@ void moveMouse(float x, float y) {
     
     if (abs(y) < threshold / 2) y = 0;
     else y -= (y > 0) ? threshold / 2 : -threshold / 2;
+
+    if(x > 0 || y > 0){
+      isMouseMoving = true;
+      isMouseMovingPrev = true;
+    }
+    else{
+      isMouseMoving = false;
+    }
     
     float converted = 0.75 * sensitivity + 0.25;
     Mouse.move(x * converted, y * converted);
@@ -218,11 +202,18 @@ void snap_mouse(int id) {
     int x = screenWidth / 2, y = screenHeight / 2;  // Default to center
 
     // Base positions for IR receivers
-    switch (id) {
-        case 26: x = 0; y = screenHeight; break;  // Left Edge
-        case 33: x = screenWidth*2; y = screenHeight; break; // Right Edge
-        case 27: x = screenWidth; y = 0; break;    // Top Center
-        case 25: x = screenWidth; y = screenHeight*2; break; // Bottom Center
+    // switch (id) {
+    //     case 26: x = 0; y = screenHeight; break;  // Left Edge
+    //     case 33: x = screenWidth*2; y = screenHeight; break; // Right Edge
+    //     case 27: x = screenWidth; y = 0; break;    // Top Center
+    //     case 25: x = screenWidth; y = screenHeight*2; break; // Bottom Center
+    // }
+
+    switch(id){
+        case 26: x = 0; y = screenHeight; break;  //bottom left
+        case 33: x = 0; y = 200; break; // top left
+        case 27: x = screenWidth; y = 200; break;    // top right
+        case 25: x = screenWidth; y = screenHeight; break; // bottom right
     }
 
     // Apply magnetometer drift correction
@@ -246,13 +237,12 @@ void snap_mouse(int id) {
     signed char lastMoveX = x - (moveXtimes * 127);
     signed char lastMoveY = y - (moveYtimes * 127);
 
-    Serial.print("Moving to ");Serial.print(x);Serial.print(" ");Serial.println(y);
-    Serial.print("Move x "); Serial.print(moveXtimes); 
-    Serial.print("Move y "); Serial.println(moveYtimes); 
-    Serial.print("Move x last "); Serial.print(lastMoveX); 
-    Serial.print("Move y last "); Serial.println(lastMoveY); 
+    // Serial.print("Moving to ");Serial.print(x);Serial.print(" ");Serial.println(y);
+    // Serial.print("Move x "); Serial.print(moveXtimes); 
+    // Serial.print("Move y "); Serial.println(moveYtimes); 
+    // Serial.print("Move x last "); Serial.print(lastMoveX); 
+    // Serial.print("Move y last "); Serial.println(lastMoveY); 
 
-    // Move in small steps
     for (int i = 0; i < moveXtimes; i++) {
         Mouse.move(127, 0, 0);
         delay(3);
@@ -271,6 +261,7 @@ int which_IR = -1;
 unsigned long lastIRTime = 0;
 bool IRActive = false;
 
+unsigned long currTime;
 void loop() {
     if (!dmpReady) return;
     get_mag();
@@ -295,98 +286,63 @@ void loop() {
 
     // Normal MPU-based movement
     get_mag();
-    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+    if(mpu.dmpGetCurrentFIFOPacket(fifoBuffer)){
         mpu.dmpGetQuaternion(&q, fifoBuffer);
         mpu.dmpGetGravity(&gravity, &q);
         mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
         
+        // Apply drift correction
+        // ypr[0] -= (mag_xyz[0] - initial_values[3]) * 0.1; // Adjust scaling factor as needed
+        // ypr[1] -= (mag_xyz[1] - initial_values[4]) * 0.1;
+        // ypr[2] -= (mag_xyz[2] - initial_values[5]) * 0.1;
+
         if (abs(ypr[1] * 180 / M_PI) < 3 * threshold) {
+            //set isMouseMoving to true in the function...
+            // for (int i=0; i<3; i++){
+            //   Serial.print(ypr[i]* 180 / M_PI);
+            //   Serial.print(" ");
+            // }
+            // Serial.println(" ");
+            
             moveMouse(ypr[0] * 180 / M_PI, ypr[2] * 180 / M_PI);
+        }
+        else{
+          if(isMouseMoving == true){
+            isMouseMoving = false;
+          }
+          else
+            isMouseMovingPrev = false;
         }
         checkMouseClicks();
     }
+
+    if(isMouseMoving == true){
+      isMouseMoving = false;
+    }
+    else{
+      isMouseMovingPrev = false;
+    }
+    
+    // Serial.print(currTime);
+    // Serial.print(" "); Serial.print(myTime); Serial.print(" "); Serial.println(isMouseMovingPrev);
+    
+    currTime = millis();
+    if ((currTime - myTime) > 30000 && (!isMouseMovingPrev)) {
+        if (abs(mag_xyz[0] - initial_values[3]) > 2 || abs(mag_xyz[1] - initial_values[4]) > 2) {
+            myTime = currTime;
+            
+            // **Reset MPU reference angles using magnetometer**
+            initial_values[0] = ypr[0] - (mag_xyz[0] - initial_values[3]);
+            initial_values[1] = ypr[1];  // Pitch might not need correction
+            initial_values[2] = ypr[2] - (mag_xyz[1] - initial_values[4]);
+
+            // Update yaw reference
+            initial_values[3] = mag_xyz[0];
+            initial_values[4] = mag_xyz[1];
+
+            Serial.println("MPU Reset: Correcting drift using magnetometer");
+        }
+  }
 }
 
 
-
-
-
-
-//IR STUFF
-// struct IRMapping {
-//     int id;
-//     int x;
-//     int y;
-// };
-
-// // Default positions for 4 IR receivers
-// IRMapping irMappings[] = {
-//     {26, 0, screenHeight},         // Left Edge
-//     {33, screenWidth * 2, screenHeight},  // Right Edge
-//     {27, screenWidth, 0},          // Top Center
-//     {25, screenWidth, screenHeight * 2}   // Bottom Center
-// };
-// };
-// int which_IR = -1;
-// void processSerialCommand() {
-//     String command = Serial.readStringUntil('\n');  // Read serial input
-//     command.trim();  // Remove any whitespace
-
-//     if (command.startsWith("SET ")) {
-//         int irID, x, y;
-//         if (sscanf(command.c_str(), "SET %d %d %d", &irID, &x, &y) == 3) {
-//             updateIRMapping(irID, x, y);
-//             Serial.println("Updated mapping.");
-//         } else {
-//             Serial.println("Invalid format. Use: SET <ID> <X> <Y>");
-//         }
-//     }
-// }
-
-// void updateIRMapping(int irID, int x, int y) {
-//     for (int i = 0; i < sizeof(irMappings) / sizeof(irMappings[0]); i++) {
-//         if (irMappings[i].id == irID) {
-               //if (irID == 33) x *= 2;
-              //if (irID == 25) y *= 2;
-//             irMappings[i].x = x;
-//             irMappings[i].y = y;
-//             Serial.print("IR ");
-//             Serial.print(irID);
-//             Serial.print(" set to (");
-//             Serial.print(x);
-//             Serial.print(", ");
-//             Serial.println(y);
-//             return;
-//         }
-//     }
-//     Serial.println("IR ID not found.");
-// }
-// // Moves the mouse based on IR input
-// void snap_mouse(int id) {
-//     for (int i = 0; i < sizeof(irMappings) / sizeof(irMappings[0]); i++) {
-//         if (irMappings[i].id == id) {
-//             moveMouseTo(irMappings[i].x, irMappings[i].y);
-//             return;
-//         }
-//     }
-//     Serial.println("IR ID not mapped.");
-// }
-
-// // Moves the mouse using small steps
-// void moveMouseTo(int x, int y) {
-//     int moveXtimes = x / 127;
-//     int moveYtimes = y / 127;
-//     signed char lastMoveX = x - (moveXtimes * 127);
-//     signed char lastMoveY = y - (moveYtimes * 127);
-//     moveMouseToOrigin();
-
-//     // Move in steps
-//     for (int i = 0; i < moveXtimes; i++) {
-//         Mouse.move(127, 0, 0);
-//     }
-//     Mouse.move(lastMoveX, 0, 0);
-//     for (int i = 0; i < moveYtimes; i++) {
-//         Mouse.move(0, 127, 0);
-//     }
-//     Mouse.move(0, lastMoveY, 0);
-// }
