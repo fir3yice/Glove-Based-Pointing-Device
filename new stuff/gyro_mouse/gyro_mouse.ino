@@ -11,8 +11,8 @@ MPU6050 mpu;
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
 
 #define INTERRUPT_PIN 2
-#define TOUCH_LEFT 7   // TTP223B for Left Click
-#define TOUCH_RIGHT 8  // TTP223B for Right Click
+#define TOUCH_LEFT 7   
+#define TOUCH_RIGHT 8  
 #define LED_PIN 13    
 #define IR_EMITTER_PIN 10
 
@@ -122,7 +122,7 @@ void setup() {
     }
 
     pinMode(IR_EMITTER_PIN, OUTPUT);
-    digitalWrite(IR_EMITTER_PIN, HIGH);  // Always ON (emitting) (might change to make it dependent on the gyroscope angle or something?)
+    digitalWrite(IR_EMITTER_PIN, HIGH);  
     Serial.print("Emitter on");
 }
 
@@ -168,14 +168,10 @@ void get_mag(){
 }
 
 void moveMouse(float x, float y) {
-    // Get magnetometer drift values
-    
-    
     float drift_x = mag_xyz[0] - initial_values[3];
     float drift_y = mag_xyz[1] - initial_values[4];
 
-    // Apply drift correction
-    x -= drift_x * 0.1; // Scaling factor to tune correction
+    x -= drift_x * 0.1;
     y -= drift_y * 0.1;
 
     if (abs(x) < threshold) x = 0;
@@ -196,9 +192,8 @@ void moveMouse(float x, float y) {
     Mouse.move(x * converted, y * converted);
 }
 
-//WORKS
+// WORKS
 void snap_mouse(int id) {
-    // Define target positions based on IR receiver ID
     int x = screenWidth / 2, y = screenHeight / 2;  // Default to center
 
     // Base positions for IR receivers
@@ -279,9 +274,9 @@ void loop() {
 
     // Block MPU movement if IR was triggered recently
     if (IRActive && millis() - lastIRTime < 1000) {
-        return;  // Skip MPU-based movement
+        return;  
     } else {
-        IRActive = false;  // Resume normal movement after 1 sec
+        IRActive = false;  
     }
 
     // Normal MPU-based movement
@@ -291,10 +286,6 @@ void loop() {
         mpu.dmpGetGravity(&gravity, &q);
         mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
         
-        // Apply drift correction
-        // ypr[0] -= (mag_xyz[0] - initial_values[3]) * 0.1; // Adjust scaling factor as needed
-        // ypr[1] -= (mag_xyz[1] - initial_values[4]) * 0.1;
-        // ypr[2] -= (mag_xyz[2] - initial_values[5]) * 0.1;
 
         if (abs(ypr[1] * 180 / M_PI) < 3 * threshold) {
             //set isMouseMoving to true in the function...
@@ -331,7 +322,7 @@ void loop() {
         if (abs(mag_xyz[0] - initial_values[3]) > 2 || abs(mag_xyz[1] - initial_values[4]) > 2) {
             myTime = currTime;
             
-            // **Reset MPU reference angles using magnetometer**
+            // Reset MPU reference angles 
             initial_values[0] = ypr[0] - (mag_xyz[0] - initial_values[3]);
             initial_values[1] = ypr[1];  // Pitch might not need correction
             initial_values[2] = ypr[2] - (mag_xyz[1] - initial_values[4]);
